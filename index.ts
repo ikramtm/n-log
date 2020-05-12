@@ -1,6 +1,15 @@
 type LoggerPlugin = (logFn: LogFn) => LogFn;
 type LogParameter = string | number | boolean | ReadonlyArray<any> | Readonly<any> | undefined;
-type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+// type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+
+enum LogLevel {
+  trace,
+  debug,
+  info,
+  warn,
+  error
+}
+
 type LogLevelOption = "trace" | "debug" | "info" | "warn" | "error" | "silent";
 
 type LogFn = (level: LogLevel, namespace: string, message: LogParameter, ...args: ReadonlyArray<LogParameter>) => void;
@@ -25,19 +34,29 @@ class NLog implements ILog {
   }
 
   trace(message: LogParameter, ...args: ReadonlyArray<LogParameter>) {
-    this._logFn("trace", this._namespace, message, ...args);
+    this._logFn(LogLevel.trace, this._namespace, message, ...args);
   }
+
   debug(message: LogParameter, ...args: ReadonlyArray<LogParameter>) {
-    this._logFn("debug", this._namespace, message, ...args);
+    this._logFn(LogLevel.debug, this._namespace, message, ...args);
   }
-  info(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>) { }
-  warn(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>) { }
-  error(message: any, ...args: ReadonlyArray<Readonly<any>>) { }
+
+  info(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>) {
+    this._logFn(LogLevel.info, this._namespace, message, ...args);
+  }
+
+  warn(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>) {
+    this._logFn(LogLevel.warn, this._namespace, message, ...args);
+  }
+
+  error(message: any, ...args: ReadonlyArray<Readonly<any>>) {
+    this._logFn(LogLevel.error, this._namespace, message, ...args);
+  }
 }
 
 const BASE_LOG_FN = (level: LogLevel, message: LogParameter, ...args: ReadonlyArray<LogParameter>) => {
   switch (level) {
-    case "debug": {
+    case LogLevel.debug: {
       console.debug(message, ...args);
     }
     default: {
@@ -63,7 +82,7 @@ export class NLogger {
 
     let log = this._logs[namespace];
     if (!log) {
-      this._logs[namespace] = log = new NLog(NLogger._log);
+      this._logs[namespace] = log = new NLog(NLogger._log, namespace);
       this._filteredLogs[namespace] = NLogger.getEnabledLogLevel(namespace);
     }
 
@@ -71,14 +90,14 @@ export class NLogger {
   }
 
   public static setLogLevel(level: LogLevelOption, namespacePattern: string) {
-    /* 
+    /*
       'contentfully:*, 'debug''
 
 
       [
         ['error', 'contentfully:service']
         ['trace', 'contentfully:service']
-      ], 
+      ],
      */
 
     // TODO: remove namspace first
@@ -107,9 +126,9 @@ export class NLogger {
   }
 
   private static _log(level: LogLevel, namespace: string, message: LogParameter, ...args: ReadonlyArray<LogParameter>) {
-
     const enabledLevel = NLogger._filteredLogs[namespace];
-    if (level >= enabledLevel) {
+
+    if (enabledLevel !== "silent" && level >= LogLevel[enabledLevel]) {
       NLogger._logFn(level, namespace, message, ...args);
     }
   }
@@ -119,7 +138,7 @@ export class NLogger {
   }
 }
 
-/* 
+/*
 // USAGE
 
 // Decorator Pattern

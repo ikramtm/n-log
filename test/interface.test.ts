@@ -5,8 +5,9 @@ import {mocked} from 'ts-jest/utils';
 (global as any).console = {
   warn: jest.fn(),
   error: jest.fn(),
-  debug: jest.fn()
-}
+  debug: jest.fn(),
+  log: jest.fn()
+};
 
 describe("NLogger", () => {
   it("should set correct log level", () => {
