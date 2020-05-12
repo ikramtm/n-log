@@ -10,7 +10,7 @@ export interface ILog {
   debug(message: LogParameter, ...args: ReadonlyArray<LogParameter>): void;
   info(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>): void;
   warn(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>): void;
-  error(message:any, ...args: ReadonlyArray<Readonly<any>>): void;
+  error(message: any, ...args: ReadonlyArray<Readonly<any>>): void;
 }
 
 class NLog implements ILog {
@@ -19,7 +19,7 @@ class NLog implements ILog {
   private readonly _namespace: string;
 
   /** what's the default namespace for the root logger (probablty should't be here) */
-  public constructor(logFn: LogFn, namespace: string = "*") {
+  public constructor(logFn: LogFn, namespace: string = '*') {
     this._logFn = logFn;
     this._namespace = namespace;
   }
@@ -30,9 +30,9 @@ class NLog implements ILog {
   debug(message: LogParameter, ...args: ReadonlyArray<LogParameter>) {
     this._logFn("debug", this._namespace, message, ...args);
   }
-  info(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>) {}
-  warn(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>) {}
-  error(message:any, ...args: ReadonlyArray<Readonly<any>>) {}
+  info(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>) { }
+  warn(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>) { }
+  error(message: any, ...args: ReadonlyArray<Readonly<any>>) { }
 }
 
 const BASE_LOG_FN = (level: LogLevel, message: LogParameter, ...args: ReadonlyArray<LogParameter>) => {
@@ -54,7 +54,7 @@ export class NLogger {
 
   public static readonly log: ILog = new NLog(NLogger._log);
   private static readonly _logs: Record<string, NLog> = {};
-  private static readonly _logLevels = Array<[LogLevel, string]>();
+  private static _logLevels = Array<[LogLevel, string]>();
   private static readonly _filteredLogs: Record<string, LogLevelOption> = {};
   private static _logFn: LogFn = BASE_LOG_FN;
 
@@ -71,35 +71,55 @@ export class NLogger {
   }
 
   public static setLogLevel(level: LogLevelOption, namespacePattern: string) {
+    /* 
+      'contentfully:*, 'debug''
+
+
+      [
+        ['error', 'contentfully:service']
+        ['trace', 'contentfully:service']
+      ], 
+     */
 
     // TODO: remove namspace first
 
-    this._logLevels.unshift([level, namespacePattern]);
-
+    // figure out how to find matching namespace within array of tuples
+    // const namespaceIndex = this._logLevels.findIndex(namespacePattern);
+    // if (namespaceIndex !== -1) {
+    //   // pretty sure it's not that simple
+    //   this._logLevels.splice(namespaceIndex, 1, [level, namespacePattern]);
+    // } else {
+    //   this._logLevels.unshift([level, namespacePattern]);
+    // }
+    return
     /** Don't screw this up... it's not simple */
     // TODO: rebuild the filtered logs mapping
   }
 
   public static addPlugin(plugin: LoggerPlugin) {
-      NLogger._logFn = plugin(NLogger._logFn);
+    NLogger._logFn = plugin(NLogger._logFn);
   }
 
   /** Don't screw this up... it's not simple */
-  private static isMatch(nanmespacePattern: string, namsepace: string) {
+  private static isMatch(namespacePattern: string, namespace: string) {
     // TODO: use some sort of regex or something to compare???
-    return nanmespacePattern === namsepace;
+    return namespacePattern === namespace;
   }
 
   private static _log(level: LogLevel, namespace: string, message: LogParameter, ...args: ReadonlyArray<LogParameter>) {
 
     const enabledLevel = NLogger._filteredLogs[namespace];
     if (level >= enabledLevel) {
-      NLogger._logFn(level, namespace, message, ...args);        
+      NLogger._logFn(level, namespace, message, ...args);
     }
+  }
+
+  private static getEnabledLogLevel(namespace: string): LogLevelOption {
+    return "trace";
   }
 }
 
-
+/* 
 // USAGE
 
 // Decorator Pattern
@@ -109,8 +129,6 @@ function prefixPlugin(logFn: LogFn) {
     logFn(level, namespace, `[PREFIX]: ${message}`, ...args);
   };
 }
-
-const log = NLogger.getLog("contenfully");
 log.debug("message", 2);
 
 // DEFAULT
@@ -118,5 +136,8 @@ NLogger.setLogLevel("error", "*");
 NLogger.setLogLevel("debug", "contentfully:*");
 NLogger.setLogLevel("info", "*");
 
+const log = NLogger.getLog("contenfully");
+
 NLogger.addPlugin(prefixPlugin);
 
+*/
