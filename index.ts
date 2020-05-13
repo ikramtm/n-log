@@ -73,7 +73,7 @@ export class NLogger {
 
   public static readonly log: ILog = new NLog(NLogger._log);
   private static readonly _logs: Record<string, NLog> = {};
-  private static _logLevels = Array<[LogLevel, string]>();
+  private static readonly _logLevels = Array<[LogLevelOption, string]>();
   private static readonly _filteredLogs: Record<string, LogLevelOption> = {};
   private static _logFn: LogFn = BASE_LOG_FN;
 
@@ -101,16 +101,24 @@ export class NLogger {
      */
 
     // TODO: remove namspace first
+    let matchedIndex = -1;
+    this._logLevels.forEach((logLevel, index) => {
+      // TODO: how to account for namespace pattern? ie: [contentfully:*] vs [contentfully:Contentfully] 
+      if (logLevel[1] === namespacePattern) {
+        matchedIndex = index;
+      }
+    })
 
-    // figure out how to find matching namespace within array of tuples
-    // const namespaceIndex = this._logLevels.findIndex(namespacePattern);
-    // if (namespaceIndex !== -1) {
-    //   // pretty sure it's not that simple
-    //   this._logLevels.splice(namespaceIndex, 1, [level, namespacePattern]);
-    // } else {
-    //   this._logLevels.unshift([level, namespacePattern]);
-    // }
-    return
+    if (matchedIndex > -1) {
+      // does this need to be first in queue or simply replace?
+      this._logLevels.splice(matchedIndex, 1, [level, namespacePattern]);
+    } else {
+      this._logLevels.unshift([level, namespacePattern]);
+    }
+    this._logLevels.forEach((logLevel) => {
+      this._filteredLogs[logLevel[1]] = logLevel[0] 
+    })
+    return this._logLevels
     /** Don't screw this up... it's not simple */
     // TODO: rebuild the filtered logs mapping
   }
@@ -134,7 +142,7 @@ export class NLogger {
   }
 
   private static getEnabledLogLevel(namespace: string): LogLevelOption {
-    return "trace";
+    return "debug";
   }
 }
 
