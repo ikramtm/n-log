@@ -90,34 +90,33 @@ export class NLogger {
   }
 
   public static setLogLevel(level: LogLevelOption, namespacePattern: string) {
-    /*
-      'contentfully:*, 'debug''
-
-
-      [
-        ['error', 'contentfully:service']
-        ['trace', 'contentfully:service']
-      ],
-     */
-
-    // TODO: remove namspace first
-    let matchedIndex = -1;
-    this._logLevels.forEach((logLevel, index) => {
-      // TODO: how to account for namespace pattern? ie: [contentfully:*] vs [contentfully:Contentfully] 
-      if (logLevel[1] === namespacePattern) {
-        matchedIndex = index;
-      }
-    })
-
-    if (matchedIndex > -1) {
-      // does this need to be first in queue or simply replace?
-      this._logLevels.splice(matchedIndex, 1, [level, namespacePattern]);
+    if (namespacePattern === '*') {
+      // overwrite the rest of namespaces from tuple and map
+      this._logLevels.splice(0, this._logLevels.length, [level, namespacePattern]);
+      // must be a better way to delete all the keys in map and update it
+      Object.keys(this._filteredLogs).forEach((logLevel) => {
+        delete this._filteredLogs[logLevel]
+      });
+      this._filteredLogs[namespacePattern] = level
     } else {
-      this._logLevels.unshift([level, namespacePattern]);
+      let matchedIndex = -1;
+      this._logLevels.forEach((logLevel, index) => {
+        // TODO: how to account for namespace pattern? ie: contentfully:* vs contentfully:Contentfully
+        if (logLevel[1] === namespacePattern) {
+          matchedIndex = index;
+        }
+      })
+          if (matchedIndex > -1) {
+            // does this need to be first in queue or simply replace?
+            this._logLevels.splice(matchedIndex, 1, [level, namespacePattern]);
+          } else {
+            this._logLevels.unshift([level, namespacePattern]);
+          }
+          this._logLevels.forEach((logLevel) => {
+            this._filteredLogs[logLevel[1]] = logLevel[0] 
+          })
     }
-    this._logLevels.forEach((logLevel) => {
-      this._filteredLogs[logLevel[1]] = logLevel[0] 
-    })
+
     return this._logLevels
     /** Don't screw this up... it's not simple */
     // TODO: rebuild the filtered logs mapping
@@ -142,7 +141,8 @@ export class NLogger {
   }
 
   private static getEnabledLogLevel(namespace: string): LogLevelOption {
-    return "debug";
+    // in case setLogLevel was called first
+    return this._filteredLogs[namespace] || "info";
   }
 }
 
@@ -161,7 +161,12 @@ log.debug("message", 2);
 // DEFAULT
 NLogger.setLogLevel("error", "*");
 NLogger.setLogLevel("debug", "contentfully:*");
+NLogger.setLogLevel("info", "contentfully:ContenfullyClient");
 NLogger.setLogLevel("info", "*");
+
+covid:19
+covid:20
+covid:*
 
 const log = NLogger.getLog("contenfully");
 

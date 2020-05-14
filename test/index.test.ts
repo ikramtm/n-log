@@ -34,10 +34,23 @@ describe("NLogger", () => {
     expect(updatedLogLevels[0][0]).toEqual('trace');
     expect(updatedLogLevels[0][1]).toEqual(additionalNameSpace);
 
+    
+  });
+
+  it("should correctly update the loglevel for an exisiting namespace", () => {
+    const nameSpace = "contentfully:";
     const overwriteLogLevels = NLogger.setLogLevel("debug", nameSpace);
 
     expect(overwriteLogLevels.length).toEqual(2);
     expect(overwriteLogLevels[1][0]).toEqual('debug');
     expect(overwriteLogLevels[1][1]).toEqual(nameSpace);
+  });
+
+  it("should reset the filtered log and logLevels when wildcard is passed", () => {
+    const overwriteLogLevels = NLogger.setLogLevel("debug", "*");
+
+    expect(overwriteLogLevels[0][0]).toEqual("debug");
+    expect(overwriteLogLevels[0][1]).toEqual("*");
+    expect(overwriteLogLevels.length).toEqual(1);
   });
 });
