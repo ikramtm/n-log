@@ -90,32 +90,47 @@ export class NLogger {
   }
 
   public static setLogLevel(level: LogLevelOption, namespacePattern: string) {
-    if (namespacePattern === '*') {
-      // overwrite the rest of namespaces from tuple and map
-      this._logLevels.splice(0, this._logLevels.length, [level, namespacePattern]);
-      // must be a better way to delete all the keys in map and update it
-      Object.keys(this._filteredLogs).forEach((logLevel) => {
-        delete this._filteredLogs[logLevel]
-      });
-      this._filteredLogs[namespacePattern] = level
+    if (this._logLevels.length === 0) { // 🤔🤔 the default _logLevel should be [["error", "*"]] right?
+      this._logLevels.unshift([level, namespacePattern]);
     } else {
-      let matchedIndex = -1;
-      this._logLevels.forEach((logLevel, index) => {
-        // TODO: how to account for namespace pattern? ie: contentfully:* vs contentfully:Contentfully
-        if (logLevel[1] === namespacePattern) {
-          matchedIndex = index;
-        }
-      })
-          if (matchedIndex > -1) {
-            // does this need to be first in queue or simply replace?
-            this._logLevels.splice(matchedIndex, 1, [level, namespacePattern]);
-          } else {
-            this._logLevels.unshift([level, namespacePattern]);
+      if (namespacePattern === '*') {
+        // overwrite the rest of namespaces from tuple and map
+        this._logLevels.splice(0, this._logLevels.length, [level, namespacePattern]);
+        // must be a better way to delete all the keys in map and update interface
+        Object.keys(this._filteredLogs).forEach((logLevel) => {
+          delete this._filteredLogs[logLevel]
+        });
+        this._filteredLogs[namespacePattern] = level
+      } else {
+        const partialMatches = []
+        let matchIndex = -1
+        this._logLevels.forEach((logLevel, index) => {
+          const matchStatus = this.isMatch(namespacePattern, logLevel[1]);
+          if (matchStatus === 1) {
+            matchIndex = index;
+          } else if (matchStatus === 0) {
+            partialMatches.push(index);
           }
-          this._logLevels.forEach((logLevel) => {
-            this._filteredLogs[logLevel[1]] = logLevel[0] 
-          })
+        })
+        
+        if (matchIndex !== -1) { // exact match
+          this._logLevels.splice(matchIndex, 1, [level, namespacePattern]);
+        } else if (partialMatches.length > 0) { // remove partial match and add wildcard namespace
+          // loop from the back of partial matches array so that it doesn't mess up the index when deleting item in _logLevels
+          for (let i = partialMatches.length -1; i >= 0; i--) {
+            this._logLevels.splice(partialMatches[i],1);
+          }
+          this._logLevels.unshift([level, namespacePattern]);
+        } else { // no match, simply add namespace to queue
+          this._logLevels.unshift([level, namespacePattern]);
+        }
+      }
+        
     }
+
+    this._logLevels.forEach((logLevel) => {
+      this._filteredLogs[logLevel[1]] = logLevel[0] 
+    })
 
     return this._logLevels
     /** Don't screw this up... it's not simple */
@@ -128,8 +143,24 @@ export class NLogger {
 
   /** Don't screw this up... it's not simple */
   private static isMatch(namespacePattern: string, namespace: string) {
-    // TODO: use some sort of regex or something to compare???
-    return namespacePattern === namespace;
+    const wildcardPresence = namespacePattern.slice(namespacePattern.length -1) === "*";
+    if (!wildcardPresence) {
+      return namespacePattern === namespace ? 1 : -1;
+    } else {
+      const [namespacePrefix] = namespace.split(":")
+      const [namespacePatternPrefix] = namespacePattern.split(":")
+      return namespacePrefix === namespacePatternPrefix ? 0 : -1
+      // TODO: use some sort of regex or something to compare???
+     /*
+     given (contentfully:*, contentfully:ContentfullyClient)
+
+     compare everything before colon to find partial match
+     if match return result as partial match
+
+     else return unmatch
+     */
+    }
+  
   }
 
   private static _log(level: LogLevel, namespace: string, message: LogParameter, ...args: ReadonlyArray<LogParameter>) {

@@ -20,30 +20,36 @@ describe("NLogger", () => {
   });
 
   it("should set correct log level", () => {
-    const nameSpace = "contentfully:";
+    const nameSpace = "contentfully:ContentfulClient";
     const logLevels = NLogger.setLogLevel("info", nameSpace);
 
     expect(logLevels.length).toEqual(1);
     expect(logLevels[0][0]).toEqual('info');
     expect(logLevels[0][1]).toEqual(nameSpace);
 
-    const additionalNameSpace = "nascent-web:";
+    const additionalNameSpace = "contentfully:index";
     const updatedLogLevels = NLogger.setLogLevel("trace", additionalNameSpace);
 
     expect(updatedLogLevels.length).toEqual(2);
     expect(updatedLogLevels[0][0]).toEqual('trace');
     expect(updatedLogLevels[0][1]).toEqual(additionalNameSpace);
-
-    
   });
 
   it("should correctly update the loglevel for an exisiting namespace", () => {
-    const nameSpace = "contentfully:";
+    const nameSpace = "contentfully:ContentfulClient";
     const overwriteLogLevels = NLogger.setLogLevel("debug", nameSpace);
 
     expect(overwriteLogLevels.length).toEqual(2);
     expect(overwriteLogLevels[1][0]).toEqual('debug');
     expect(overwriteLogLevels[1][1]).toEqual(nameSpace);
+  });
+  
+  it("should return partial match if namespace with wildcard is passed", () => {
+    const overwriteLogLevels = NLogger.setLogLevel("warn","contentfully:*")
+
+    expect(overwriteLogLevels.length).toEqual(1);
+    expect(overwriteLogLevels[0][1]).toEqual("contentfully:*");
+    expect(overwriteLogLevels[0][0]).toEqual('warn');
   });
 
   it("should reset the filtered log and logLevels when wildcard is passed", () => {
@@ -53,4 +59,5 @@ describe("NLogger", () => {
     expect(overwriteLogLevels[0][1]).toEqual("*");
     expect(overwriteLogLevels.length).toEqual(1);
   });
+
 });
