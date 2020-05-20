@@ -65,7 +65,6 @@ const BASE_LOG_FN = (level: LogLevel, message: LogParameter, ...args: ReadonlyAr
   }
 }
 
-
 /**
  * Where's the validation and edge cases
  */
@@ -73,7 +72,7 @@ export class NLogger {
 
   public static readonly log: ILog = new NLog(NLogger._log);
   private static readonly _logs: Record<string, NLog> = {};
-  private static readonly _logLevels = Array<[LogLevelOption, string]>();
+  private static readonly _logLevels: Array<[LogLevelOption, string]> = [["error", '*']];
   private static readonly _filteredLogs: Record<string, LogLevelOption> = {};
   private static _logFn: LogFn = BASE_LOG_FN;
 
@@ -89,47 +88,44 @@ export class NLogger {
     return log;
   }
 
-  public static setLogLevel(level: LogLevelOption, namespacePattern: string) {
-    if (this._logLevels.length === 0) { // 🤔🤔 the default _logLevel should be [["error", "*"]] right?
-      this._logLevels.unshift([level, namespacePattern]);
-    } else {
-      if (namespacePattern === '*') {
-        // overwrite the rest of namespaces from tuple and map
-        this._logLevels.splice(0, this._logLevels.length, [level, namespacePattern]);
-        // must be a better way to delete all the keys in map and update interface
-        Object.keys(this._filteredLogs).forEach((logLevel) => {
-          delete this._filteredLogs[logLevel]
-        });
-        this._filteredLogs[namespacePattern] = level
-      } else {
-        const partialMatches = []
-        let matchIndex = -1
-        this._logLevels.forEach((logLevel, index) => {
-          const matchStatus = this.isMatch(namespacePattern, logLevel[1]);
-          if (matchStatus === 1) {
-            matchIndex = index;
-          } else if (matchStatus === 0) {
-            partialMatches.push(index);
-          }
-        })
-        
-        if (matchIndex !== -1) { // exact match
-          this._logLevels.splice(matchIndex, 1, [level, namespacePattern]);
-        } else if (partialMatches.length > 0) { // remove partial match and add wildcard namespace
-          // loop from the back of partial matches array so that it doesn't mess up the index when deleting item in _logLevels
-          for (let i = partialMatches.length -1; i >= 0; i--) {
-            this._logLevels.splice(partialMatches[i],1);
-          }
-          this._logLevels.unshift([level, namespacePattern]);
-        } else { // no match, simply add namespace to queue
-          this._logLevels.unshift([level, namespacePattern]);
+
+  // ['warn', '*']
+  // ['info', 'contentfully']
+  // ['trace', 'contentfully:service']
+  // ['debug', 'contentfully:*']
+  /* 
+    [
+      ['warn', '*'],
+      ['info', 'contentfully']
+    ]
+
+    {
+      'contentfully:service': 'warn',
+      // 'contentfully:*': 'error',
+      'contentfully:manager/index': 'error'
+
+      contentfully: {
+        *: 'warn',
+        service: 'error'
+        manager: {
+          index: 'debug
         }
       }
-        
     }
 
+    ["contentfully", "*"]
+   */
+
+   
+  public static setLogLevel(level: LogLevelOption, namespacePattern: string) {
+    this._logLevels.unshift([level, namespacePattern])
+
     this._logLevels.forEach((logLevel) => {
-      this._filteredLogs[logLevel[1]] = logLevel[0] 
+      const namespace = logLevel[1];
+      if (this.isMatch(namespacePattern, namespace)) {
+        logLevel[0] = level;
+      }
+      
     })
 
     return this._logLevels
@@ -142,25 +138,38 @@ export class NLogger {
   }
 
   /** Don't screw this up... it's not simple */
-  private static isMatch(namespacePattern: string, namespace: string) {
-    const wildcardPresence = namespacePattern.slice(namespacePattern.length -1) === "*";
-    if (!wildcardPresence) {
-      return namespacePattern === namespace ? 1 : -1;
-    } else {
-      const [namespacePrefix] = namespace.split(":")
-      const [namespacePatternPrefix] = namespacePattern.split(":")
-      return namespacePrefix === namespacePatternPrefix ? 0 : -1
-      // TODO: use some sort of regex or something to compare???
-     /*
-     given (contentfully:*, contentfully:ContentfullyClient)
-
-     compare everything before colon to find partial match
-     if match return result as partial match
-
-     else return unmatch
-     */
+  private static isMatch(namespacePattern: string, namespace: string): boolean {
+    // if pattern is wildcard or matches exactly
+    if (namespacePattern === '*' || namespacePattern === namespace) {
+      // matches
+      return true
     }
-  
+    
+    const namespaces = namespacePattern.split(':')
+    const currentNamespaces = namespace.split(':')
+
+    // iterate through namespaces
+    for (let i; i < namespaces.length; i++) {
+      // if namespace is wildcard
+      if (namespaces[i] === '*') {
+        // match
+        return true;
+      }
+      // if namespace matches current namespace
+      if (namespaces[i] === currentNamespaces[i]) {
+        // if namespace is at last index
+        if (i === namespaces.length - 1) {
+          // match
+          return i === currentNamespaces.length - 1;
+        }
+        // continue iterating
+        continue;
+      }
+      // does not match
+      return false;
+    }
+
+    return false;
   }
 
   private static _log(level: LogLevel, namespace: string, message: LogParameter, ...args: ReadonlyArray<LogParameter>) {
