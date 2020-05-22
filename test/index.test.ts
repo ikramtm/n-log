@@ -55,6 +55,42 @@ describe("NLogger", () => {
     expect(console.warn).not.toHaveBeenCalled();
   });
 
+  it("should set correct log level if wildcard is set", () => {
+    const namespace = "contentfully:ContentfulClient";
+    const message = "message";
+
+    // set log level for namespace
+    NLogger.setLogLevel("error", "*");
+
+    // get logger
+    const logger = NLogger.getLog(namespace);
+
+    // log warning
+    logger.warn(message);
+
+    // expectations
+    expect(console.log).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(console.debug).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+
+    NLogger.setLogLevel("warn", "contentfully:*");
+    logger.info(message);
+    // expectations
+    expect(console.log).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(console.debug).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+
+    logger.warn(message);
+
+    // expectations
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(console.log).not.toHaveBeenCalled();
+    expect(console.debug).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
   // it("should correctly update the loglevel for an existing namespace", () => {
   //   const nameSpace = "contentfully:ContentfulClient";
   //   const overwriteLogLevels = NLogger.setLogLevel("debug", nameSpace);

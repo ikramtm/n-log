@@ -187,25 +187,30 @@ export class NLogger {
     *
     * NLogger.getLog("react")
     * Nlogger.getLog("contentful:service")
-    * Nlogger.getLog("contentful:service:client:file")
+    * Nlogger.getLog("contentful:service:client:index")
+    * Nlogger.getLog("*")
     * */
 
     // split namespace by separator
-    // const splitNamespace = this.splitNamespaceBySeparator(namespace);
-    // let index = splitNamespace.length - 1;
-    //
-    // while (index >= 0) {
-    //   const wildcardNamespace = namespace.replace(splitNamespace[index], "*");
-    //
-    //   const wildcard = this._filteredLogs[wildcardNamespace];
-    //
-    //   // if wildcard namespace is set
-    //   if (wildcard) {
-    //     // return level
-    //     return wildcard;
-    //   }
-    // }
+    const splitNamespace = this.splitNamespaceBySeparator(namespace);
+    let index = splitNamespace.length - 1;
 
+    let updatedNamespace = namespace;
+
+    while (index >= 0) {
+      const wildcardNamespace = updatedNamespace.replace(splitNamespace[index], "*");
+
+      const wildcard = this._filteredLogs[wildcardNamespace];
+
+      // if wildcard namespace is set
+      if (wildcard) {
+        // return level
+        return wildcard;
+      }
+
+      updatedNamespace = wildcardNamespace.replace(':*', '');
+      index--;
+    }
 
     // return default level
     return "info";
