@@ -1,5 +1,6 @@
 type LoggerPlugin = (logFn: LogFn) => LogFn;
 type LogParameter = string | number | boolean | ReadonlyArray<any> | Readonly<any> | undefined;
+
 // type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
 
 enum LogLevel {
@@ -11,15 +12,18 @@ enum LogLevel {
 }
 
 type LogLevelOption = "trace" | "debug" | "info" | "warn" | "error" | "silent";
-
 type LogFn = (level: LogLevel, namespace: string, message: LogParameter, ...args: ReadonlyArray<LogParameter>) => void;
 
 export interface ILog {
   trace(message: LogParameter, ...args: ReadonlyArray<LogParameter>): void;
+
   debug(message: LogParameter, ...args: ReadonlyArray<LogParameter>): void;
-  info(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>): void;
-  warn(message: Readonly<any>, ...args: ReadonlyArray<Readonly<any>>): void;
-  error(message: any, ...args: ReadonlyArray<Readonly<any>>): void;
+
+  info(message: LogParameter, ...args: ReadonlyArray<LogParameter>): void;
+
+  warn(message: LogParameter, ...args: ReadonlyArray<LogParameter>): void;
+
+  error(message: LogParameter, ...args: ReadonlyArray<LogParameter>): void;
 }
 
 class NLog implements ILog {
@@ -28,7 +32,7 @@ class NLog implements ILog {
   private readonly _namespace: string;
 
   /** what's the default namespace for the root logger (probablty should't be here) */
-  public constructor(logFn: LogFn, namespace: string = '*') {
+  public constructor(logFn: LogFn, namespace: string = "*") {
     this._logFn = logFn;
     this._namespace = namespace;
   }
@@ -58,12 +62,21 @@ const BASE_LOG_FN = (level: LogLevel, message: LogParameter, ...args: ReadonlyAr
   switch (level) {
     case LogLevel.debug: {
       console.debug(message, ...args);
+      break;
+    }
+    case LogLevel.warn: {
+      console.warn(message, ...args);
+      break;
+    }
+    case LogLevel.error: {
+      console.error(message, ...args);
+      break;
     }
     default: {
       console.log(message, ...args);
     }
   }
-}
+};
 
 /**
  * Where's the validation and edge cases
@@ -72,7 +85,7 @@ export class NLogger {
 
   public static readonly log: ILog = new NLog(NLogger._log);
   private static readonly _logs: Record<string, NLog> = {};
-  private static readonly _logLevels: Array<[LogLevelOption, string]> = [["error", '*']];
+  private static readonly _logLevels = Array<[LogLevelOption, string]>();
   private static readonly _filteredLogs: Record<string, LogLevelOption> = {};
   private static _logFn: LogFn = BASE_LOG_FN;
 
@@ -88,49 +101,26 @@ export class NLogger {
     return log;
   }
 
-
-  // ['warn', '*']
-  // ['info', 'contentfully']
-  // ['trace', 'contentfully:service']
-  // ['debug', 'contentfully:*']
-  /* 
-    [
-      ['warn', '*'],
-      ['info', 'contentfully']
-    ]
-
-    {
-      'contentfully:service': 'warn',
-      // 'contentfully:*': 'error',
-      'contentfully:manager/index': 'error'
-
-      contentfully: {
-        *: 'warn',
-        service: 'error'
-        manager: {
-          index: 'debug
-        }
-      }
-    }
-
-    ["contentfully", "*"]
-   */
-
-   
   public static setLogLevel(level: LogLevelOption, namespacePattern: string) {
-    this._logLevels.unshift([level, namespacePattern])
+    // find existing log level by namespace pattern
+    const existing = this._logLevels.find(logLevel => {
+      return logLevel[1] === namespacePattern;
+    });
+
+    // if not already existing
+    if (existing === undefined) {
+      // add to front of log levels
+      this._logLevels.unshift([level, namespacePattern]);
+      this._filteredLogs[namespacePattern] = level;
+    }
 
     this._logLevels.forEach((logLevel) => {
       const namespace = logLevel[1];
-      if (this.isMatch(namespacePattern, namespace)) {
+      if (this.matchesNamespace(namespacePattern, namespace)) {
         logLevel[0] = level;
+        this._filteredLogs[namespacePattern] = level;
       }
-      
-    })
-
-    return this._logLevels
-    /** Don't screw this up... it's not simple */
-    // TODO: rebuild the filtered logs mapping
+    });
   }
 
   public static addPlugin(plugin: LoggerPlugin) {
@@ -138,29 +128,30 @@ export class NLogger {
   }
 
   /** Don't screw this up... it's not simple */
-  private static isMatch(namespacePattern: string, namespace: string): boolean {
+  private static matchesNamespace(updated: string, current: string): boolean {
     // if pattern is wildcard or matches exactly
-    if (namespacePattern === '*' || namespacePattern === namespace) {
+    if (updated === "*" || updated === current) {
       // matches
-      return true
+      return true;
     }
-    
-    const namespaces = namespacePattern.split(':')
-    const currentNamespaces = namespace.split(':')
+
+    // create array of split namespaces by separator
+    const updatedNamespacesSplit = this.splitNamespaceBySeparator(updated);
+    const currentNamespacesSplit = this.splitNamespaceBySeparator(current);
 
     // iterate through namespaces
-    for (let i; i < namespaces.length; i++) {
+    for (let i = 0; i < updatedNamespacesSplit.length; i++) {
       // if namespace is wildcard
-      if (namespaces[i] === '*') {
+      if (updatedNamespacesSplit[i] === "*") {
         // match
         return true;
       }
       // if namespace matches current namespace
-      if (namespaces[i] === currentNamespaces[i]) {
+      if (updatedNamespacesSplit[i] === currentNamespacesSplit[i]) {
         // if namespace is at last index
-        if (i === namespaces.length - 1) {
+        if (i === updatedNamespacesSplit.length - 1) {
           // match
-          return i === currentNamespaces.length - 1;
+          return i === currentNamespacesSplit.length - 1;
         }
         // continue iterating
         continue;
@@ -169,6 +160,7 @@ export class NLogger {
       return false;
     }
 
+    // fallback, should not reach here
     return false;
   }
 
@@ -181,8 +173,46 @@ export class NLogger {
   }
 
   private static getEnabledLogLevel(namespace: string): LogLevelOption {
-    // in case setLogLevel was called first
-    return this._filteredLogs[namespace] || "info";
+    const level = this._filteredLogs[namespace];
+
+    // if namespace is set exactly
+    if (level) {
+      // return level
+      return level;
+    }
+
+    /*
+      NLogger.setLogLevel('error', '*')
+    * NLogger.setLogLevel('error', 'contentful:*')
+    *
+    * NLogger.getLog("react")
+    * Nlogger.getLog("contentful:service")
+    * Nlogger.getLog("contentful:service:client:file")
+    * */
+
+    // split namespace by separator
+    // const splitNamespace = this.splitNamespaceBySeparator(namespace);
+    // let index = splitNamespace.length - 1;
+    //
+    // while (index >= 0) {
+    //   const wildcardNamespace = namespace.replace(splitNamespace[index], "*");
+    //
+    //   const wildcard = this._filteredLogs[wildcardNamespace];
+    //
+    //   // if wildcard namespace is set
+    //   if (wildcard) {
+    //     // return level
+    //     return wildcard;
+    //   }
+    // }
+
+
+    // return default level
+    return "info";
+  }
+
+  private static splitNamespaceBySeparator(namespace) {
+    return namespace.split(":");
   }
 }
 
